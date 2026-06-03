@@ -1,0 +1,56 @@
+# Despliegue cliente final — chatbot Zinekide.
+#
+# Levanta SOLO el chatbot-backend (con el widget embebido en la misma imagen).
+# Expone el puerto 3001 al loopback del host. El cliente lo enchufa a su
+# Nginx/Apache existente con un reverse proxy (ver nginx/zinekide-chatbot.conf.template
+# o ejecuta setup-nginx.sh).
+#
+# La imagen se descarga PRE-CONSTRUIDA desde GitHub Container Registry — el
+# servidor del cliente NO compila código.
+#
+# Antes del primer arranque:
+#   1. Crea .env desde .env.example y rellena los valores.
+#   2. docker login ghcr.io -u <usuario-github-dvm> --password-stdin <<< "<TOKEN>"
+#   3. docker compose pull
+#   4. docker compose up -d
+#
+# Reverse proxy: ver setup-nginx.sh (script idempotente) o el .conf de ejemplo.
+
+services:
+  chatbot-backend:
+    image: ${CHATBOT_IMAGE:?defina CHATBOT_IMAGE (ej. ghcr.io/naahiki/zinekide-chatbot:2.0.2)}
+    pull_policy: always
+    ports:
+      # Sólo loopback — el reverse proxy del host (Nginx) hace el reverse
+      # proxy con SSL hacia este puerto. NO exponer al exterior directamente.
+      - "127.0.0.1:${HOST_PORT:-3001}:3001"
+    environment:
+      NODE_ENV: production
+      CHATBOT_PORT: 3001
+      # ─── LLM ────────────────────────────────────────────────────────────
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # ─── Partner (Symfony de Veiss) ────────────────────────────────────
+      PARTNER_API_URL: ${PARTNER_API_URL:?defina PARTNER_API_URL apuntando al Symfony de Veiss}
+      PARTNER_API_KEY: ${PARTNER_API_KEY:?defina PARTNER_API_KEY (Bearer compartido para /api/chat/events)}
+      PARTNER_SEARCH_AUTH_SCHEME: ${PARTNER_SEARCH_AUTH_SCHEME:-none}
+      PARTNER_SEARCH_AUTH_TOKEN: ${PARTNER_SEARCH_AUTH_TOKEN:-}
+      PARTNER_SEARCH_AUTH_HEADER: ${PARTNER_SEARCH_AUTH_HEADER:-}
+      PARTNER_TIMEOUT_MS: ${PARTNER_TIMEOUT_MS:-5000}
+      # ─── CORS ──────────────────────────────────────────────────────────
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?defina ALLOWED_ORIGINS con los dominios donde se carga el widget}
+      # ─── Rate limit y validación ──────────────────────────────────────
+      RATE_LIMIT_SESSION_CAPACITY: ${RATE_LIMIT_SESSION_CAPACITY:-20}
+      RATE_LIMIT_IP_CAPACITY: ${RATE_LIMIT_IP_CAPACITY:-60}
+      MAX_MESSAGE_LEN: ${MAX_MESSAGE_LEN:-2000}
+      # ─── Logging ───────────────────────────────────────────────────────
+      LOG_DEST: stdout
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

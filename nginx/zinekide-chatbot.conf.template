@@ -1,0 +1,77 @@
+# Reverse proxy Nginx para el chatbot Zinekide.
+#
+# Variables sustituidas por setup-nginx.sh:
+#   {{DOMAIN}}    -> dominio público (ej. chatbot.zinekide.eus)
+#   {{HOST_PORT}} -> puerto local donde escucha el container (default 3001)
+#
+# Sirve:
+#   - /widget.v*.js, /widget.latest.js        (bundle del widget, cacheable)
+#   - /chat, /widget/config, /healthz, /readyz (API del chatbot)
+#
+# El SSL cert lo emite certbot --nginx con Let's Encrypt.
+
+# HTTP -> HTTPS redirect + challenge ACME
+server {
+  listen 80;
+  listen [::]:80;
+  server_name {{DOMAIN}};
+
+  location /.well-known/acme-challenge/ {
+    root /var/www/html;
+  }
+
+  location / {
+    return 301 https://$host$request_uri;
+  }
+}
+
+# HTTPS
+server {
+  listen 443 ssl http2;
+  listen [::]:443 ssl http2;
+  server_name {{DOMAIN}};
+
+  ssl_certificate     /etc/letsencrypt/live/{{DOMAIN}}/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/{{DOMAIN}}/privkey.pem;
+
+  # TLS sensato (TLS1.2+, HSTS un año tras la primera prueba en producción).
+  ssl_protocols TLSv1.2 TLSv1.3;
+  ssl_prefer_server_ciphers off;
+  ssl_session_cache shared:SSL:10m;
+
+  # Bundle del widget (servido por el chatbot-backend, cache largo).
+  location ~ ^/widget\.v[0-9]+\.[0-9]+\.[0-9]+\.js$ {
+    proxy_pass http://127.0.0.1:{{HOST_PORT}};
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    expires 1y;
+    add_header Cache-Control "public, immutable";
+  }
+
+  # Alias `latest` (cache corto para no servir versión vieja indefinidamente).
+  location = /widget.latest.js {
+    proxy_pass http://127.0.0.1:{{HOST_PORT}}/widget/widget.latest.js;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    expires 5m;
+  }
+
+  # Endpoints del chatbot (mismo origen que el widget para evitar CORS extra).
+  location = /chat           { proxy_pass http://127.0.0.1:{{HOST_PORT}}; include /etc/nginx/snippets/zinekide-chatbot-proxy.conf; }
+  location = /widget/config  { proxy_pass http://127.0.0.1:{{HOST_PORT}}; include /etc/nginx/snippets/zinekide-chatbot-proxy.conf; }
+  location = /healthz        { proxy_pass http://127.0.0.1:{{HOST_PORT}}; include /etc/nginx/snippets/zinekide-chatbot-proxy.conf; }
+  location = /readyz         { proxy_pass http://127.0.0.1:{{HOST_PORT}}; include /etc/nginx/snippets/zinekide-chatbot-proxy.conf; }
+
+  # Bloquear cualquier otra ruta (no exponer / por accidente).
+  location / {
+    return 404;
+  }
+
+  # Logging útil para diagnosticar.
+  access_log /var/log/nginx/{{DOMAIN}}.access.log;
+  error_log  /var/log/nginx/{{DOMAIN}}.error.log warn;
+}

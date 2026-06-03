@@ -1,0 +1,10 @@
+# El .env real nunca va al repo (contiene secrets)
+.env
+.env.local
+
+# macOS
+.DS_Store
+
+# Backups locales
+*.bak
+*.bak.*
