@@ -5,7 +5,7 @@ Archivos de configuración para desplegar el [chatbot Zinekide](https://github.c
 Este repo contiene **solo configs y scripts**, no incluye código fuente. El motor del chatbot se descarga como imagen Docker pre-construida desde GitHub Container Registry.
 
 - **Imagen Docker**: `ghcr.io/naahiki/zinekide-chatbot` (privada, acceso vía PAT facilitado por [DVM](https://datavaluemanagement.es))
-- **Versión actual recomendada**: `2.0.5`
+- **Versión actual recomendada**: `2.0.6`
 
 ---
 
@@ -105,7 +105,7 @@ Detalle completo y comentado en [`.env.example`](.env.example).
 
 | Variable | Requerido | Descripción |
 |----------|-----------|-------------|
-| `CHATBOT_IMAGE` | ✓ | Imagen Docker, ej. `ghcr.io/naahiki/zinekide-chatbot:2.0.5` |
+| `CHATBOT_IMAGE` | ✓ | Imagen Docker, ej. `ghcr.io/naahiki/zinekide-chatbot:2.0.6` |
 | `OPENAI_API_KEY` o `ANTHROPIC_API_KEY` | ✓ | Al menos una de las dos |
 | `PARTNER_API_URL` | ✓ | URL del Symfony con los endpoints REST |
 | `PARTNER_API_KEY` | ✓ | Bearer compartido para `/api/chat/events` |
@@ -121,7 +121,7 @@ Detalle completo y comentado en [`.env.example`](.env.example).
 ### Actualizar a versión nueva de la imagen
 
 ```bash
-# Editar .env: CHATBOT_IMAGE=ghcr.io/naahiki/zinekide-chatbot:2.0.5
+# Editar .env: CHATBOT_IMAGE=ghcr.io/naahiki/zinekide-chatbot:2.0.6
 docker compose pull
 docker compose up -d
 ```
@@ -153,7 +153,8 @@ docker compose logs chatbot-backend -f --tail=100
 
 Las tags de este repo siguen el versionado de la imagen Docker:
 
-- `v2.0.5` (actual) — filtrado por score + FORCE_PROJECT_STATUS + investment numérico
+- `v2.0.6` (actual) — fix: `Project.investment` es string (no number)
+- `v2.0.5` — filtrado por score + FORCE_PROJECT_STATUS + shape de `investment` reflejado
 - `v2.0.4` — events solo 3 campos + filtro `status[]` en search
 - `v2.0.3` — toggles `*_FROM_PARTNER` para escenarios sin esos endpoints
 - `v2.0.2` — widget embebido + plug & play
