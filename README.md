@@ -5,7 +5,7 @@ Archivos de configuración para desplegar el [chatbot Zinekide](https://github.c
 Este repo contiene **solo configs y scripts**, no incluye código fuente. El motor del chatbot se descarga como imagen Docker pre-construida desde GitHub Container Registry.
 
 - **Imagen Docker**: `ghcr.io/naahiki/zinekide-chatbot` (privada, acceso vía PAT facilitado por [DVM](https://datavaluemanagement.es))
-- **Versión actual recomendada**: `2.0.2`
+- **Versión actual recomendada**: `2.0.3`
 
 ---
 
@@ -153,7 +153,8 @@ docker compose logs chatbot-backend -f --tail=100
 
 Las tags de este repo siguen el versionado de la imagen Docker:
 
-- `v2.0.2` (actual)
+- `v2.0.3` (actual)
+- `v2.0.2` — widget embebido + plug & play
 - `v2.0.1` — refinamiento prompt
 - `v2.0.0` — primera release v2
 
