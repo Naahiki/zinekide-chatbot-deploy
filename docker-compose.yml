@@ -30,6 +30,8 @@ services:
       # ─── LLM ────────────────────────────────────────────────────────────
       LLM_PROVIDER: ${LLM_PROVIDER:-openai}
       LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+      LLM_CONFIG_FROM_PARTNER: ${LLM_CONFIG_FROM_PARTNER:-true}
+      WIDGET_CONFIG_FROM_PARTNER: ${WIDGET_CONFIG_FROM_PARTNER:-true}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       # ─── Partner (Symfony de Veiss) ────────────────────────────────────

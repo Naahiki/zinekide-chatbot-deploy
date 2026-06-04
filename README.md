@@ -105,7 +105,7 @@ Detalle completo y comentado en [`.env.example`](.env.example).
 
 | Variable | Requerido | Descripción |
 |----------|-----------|-------------|
-| `CHATBOT_IMAGE` | ✓ | Imagen Docker, ej. `ghcr.io/naahiki/zinekide-chatbot:2.0.2` |
+| `CHATBOT_IMAGE` | ✓ | Imagen Docker, ej. `ghcr.io/naahiki/zinekide-chatbot:2.0.3` |
 | `OPENAI_API_KEY` o `ANTHROPIC_API_KEY` | ✓ | Al menos una de las dos |
 | `PARTNER_API_URL` | ✓ | URL del Symfony con los endpoints REST |
 | `PARTNER_API_KEY` | ✓ | Bearer compartido para `/api/chat/events` |
