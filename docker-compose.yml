@@ -41,6 +41,7 @@ services:
       PARTNER_SEARCH_AUTH_TOKEN: ${PARTNER_SEARCH_AUTH_TOKEN:-}
       PARTNER_SEARCH_AUTH_HEADER: ${PARTNER_SEARCH_AUTH_HEADER:-}
       PARTNER_TIMEOUT_MS: ${PARTNER_TIMEOUT_MS:-5000}
+      FORCE_PROJECT_STATUS: ${FORCE_PROJECT_STATUS:-}
       # ─── CORS ──────────────────────────────────────────────────────────
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?defina ALLOWED_ORIGINS con los dominios donde se carga el widget}
       # ─── Rate limit y validación ──────────────────────────────────────
