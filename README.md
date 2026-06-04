@@ -153,7 +153,8 @@ docker compose logs chatbot-backend -f --tail=100
 
 Las tags de este repo siguen el versionado de la imagen Docker:
 
-- `v2.0.4` (actual)
+- `v2.0.4` (actual) — events solo 3 campos + filtro `status[]` en search
+- `v2.0.3` — toggles `*_FROM_PARTNER` para escenarios sin esos endpoints
 - `v2.0.2` — widget embebido + plug & play
 - `v2.0.1` — refinamiento prompt
 - `v2.0.0` — primera release v2
