@@ -1,42 +1,83 @@
-# Zinekide Chatbot · Despliegue
+# Zinekide Chatbot — Despliegue
 
-Archivos de configuración para desplegar el [chatbot Zinekide](https://github.com/Naahiki/zinekide-chatbot) en el servidor del cliente.
+Configuración y scripts para desplegar el chatbot de [Zinekide](https://zinekide.eus) en el servidor del cliente.
 
-Este repo contiene **solo configs y scripts**, no incluye código fuente. El motor del chatbot se descarga como imagen Docker pre-construida desde GitHub Container Registry.
+El motor del chatbot (backend + widget) viene como **imagen Docker pre-construida** desde GitHub Container Registry. Este repo solo contiene los archivos de configuración (`docker-compose.yml`, `.env.example`, `nginx/`, `setup-nginx.sh`). No hay código fuente del chatbot aquí.
 
-- **Imagen Docker**: `ghcr.io/naahiki/zinekide-chatbot` (privada, acceso vía PAT facilitado por [DVM](https://datavaluemanagement.es))
-- **Versión actual recomendada**: `2.0.6`
-
----
-
-## Qué hay en este repo
-
-| Archivo | Propósito |
-|---------|-----------|
-| `docker-compose.yml` | Define el servicio del chatbot (1 container, pull desde GHCR). |
-| `.env.example` | Plantilla de variables de entorno. Copiar a `.env` y rellenar. |
-| `nginx/zinekide-chatbot.conf.template` | Site Nginx (reverse proxy + SSL). Adaptar al hostname del cliente. |
-| `nginx/zinekide-chatbot-proxy.conf` | Snippet con headers de proxy reutilizables. |
-| `setup-nginx.sh` | (Opcional) Script idempotente que configura Nginx + SSL automáticamente desde `.env`. Útil en despliegues simples; sysadmins con Nginx personalizado pueden adaptar el `.conf` a mano. |
+- **Imagen Docker:** `ghcr.io/naahiki/zinekide-chatbot:2.0.23` (privada, acceso vía PAT facilitado por DVM).
+- **Versionado:** las tags de este repo (`v2.0.23`, ...) van en espejo con las versiones de imagen. Hacéis `git checkout v2.0.23` y el `.env.example` ya apunta a la imagen correcta.
+- **Soporte:** Data Value Management (DVM) — nahiki.dev@gmail.com.
 
 ---
 
-## Despliegue en 4 pasos
+## Arquitectura
 
-### Pre-requisitos
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                       NAVEGADOR del usuario                      │
+│                                                                  │
+│   visita ─►  https://zinekide.eus                                │
+│                  │                                               │
+│                  │ <script src="https://chatbot.xxx/widget.js">  │
+│                  ▼                                               │
+│         ┌─────────────────────────────────────┐                  │
+│         │  Widget JS  (Shadow DOM, ~70 KB)    │                  │
+│         └────────────────┬────────────────────┘                  │
+│                          │ POST /chat                            │
+└──────────────────────────┼───────────────────────────────────────┘
+                           ▼
+┌──────────────────────────────────────────────────────────────────┐
+│              SERVER DEL CLIENTE                                  │
+│                                                                  │
+│   Nginx + SSL (Let's Encrypt)                                    │
+│    ├─ /widget.v*.js     ────►┐                                   │
+│    ├─ /chat                  │  127.0.0.1:3001                   │
+│    ├─ /widget/config         ►│  ┌──────────────────────────┐    │
+│    ├─ /healthz, /readyz  ───►┘  │ chatbot-backend (Docker) │    │
+│                                 │ - Motor LLM              │    │
+│                                 │ - Widget embebido        │    │
+│                                 └────────────┬─────────────┘    │
+│                                              │                  │
+│   Symfony de Veiss — zinekide.eus            │                  │
+│    └─ /api/projects/*, /api/chat/events  ◄───┘                  │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
+```
 
-- Servidor Linux (Ubuntu/Debian) con Docker + Compose v2.
-- Nginx + Certbot ya instalados (típicamente ya los tendréis sirviendo otros sites).
-- A-record del subdominio del chatbot apuntando al servidor (ej. `chatbot.example.eus`).
-- API key de OpenAI o Anthropic (la paga el cliente final).
-- PAT de GitHub con scope `read:packages` (lo facilita DVM).
+El widget habla siempre con el chatbot, nunca directamente con Symfony.
 
-### 1. Descargar archivos
+---
+
+## Requisitos del servidor
+
+| Requisito | Comprobación |
+|---|---|
+| Linux (Ubuntu 22.04+ / Debian 12+) | `lsb_release -a` |
+| Docker + Docker Compose v2 | `docker --version`, `docker compose version` |
+| Nginx + Certbot | `nginx -v`, `certbot --version` |
+| Puertos 80 y 443 abiertos | A internet, para Let's Encrypt |
+| Subdominio del chatbot apuntando al servidor | `dig +short chatbot.zinekide.eus @1.1.1.1` |
+| PAT de GHCR | Facilitado por DVM (scope `read:packages`) |
+| API key de OpenAI o Anthropic | La paga el cliente |
+
+---
+
+## Despliegue paso a paso
+
+### 1. Clonar este repo en el servidor
 
 ```bash
+ssh root@<ip-servidor>
 mkdir -p /opt/zinekide-chatbot && cd /opt/zinekide-chatbot
 git clone https://github.com/Naahiki/zinekide-chatbot-deploy.git .
-# o descomprimir el .zip equivalente
+git checkout v2.0.23
+```
+
+Sin `git`, alternativa equivalente:
+
+```bash
+curl -L https://github.com/Naahiki/zinekide-chatbot-deploy/archive/refs/tags/v2.0.23.tar.gz \
+  | tar xz --strip-components=1
 ```
 
 ### 2. Configurar `.env`
@@ -46,119 +87,154 @@ cp .env.example .env
 nano .env
 ```
 
-Rellenar los campos marcados como REQUERIDO en la plantilla. El resto tienen defaults sanos.
+Rellenad los valores marcados como **REQUERIDO**. El resto tiene defaults sanos.
 
-### 3. Pullear la imagen y arrancar el container
+Lo mínimo:
+
+```dotenv
+CHATBOT_IMAGE=ghcr.io/naahiki/zinekide-chatbot:2.0.23
+OPENAI_API_KEY=sk-proj-...
+PARTNER_API_URL=https://zinekide.eus
+ALLOWED_ORIGINS=https://zinekide.eus,https://www.zinekide.eus
+PUBLIC_DOMAIN=chatbot.zinekide.eus
+ADMIN_EMAIL=ops@zinekide.eus
+```
+
+### 3. Autenticarse en GHCR y arrancar el container
 
 ```bash
-echo "<TOKEN_GHCR>" | docker login ghcr.io -u <usuario-dvm> --password-stdin
+echo "<PAT_GHCR>" | docker login ghcr.io -u naahiki --password-stdin
 docker compose pull
 docker compose up -d
 ```
 
-El chatbot queda escuchando en `127.0.0.1:3001` (solo loopback).
+El chatbot escucha en `127.0.0.1:3001` (loopback, no expuesto a internet aún).
 
 ### 4. Configurar Nginx + SSL
 
-Hay dos vías, según el cliente prefiera control manual o automatización:
-
-#### A) Si vuestro sysadmin gestiona Nginx a mano (recomendado en entornos serios)
-
-1. Copiar `nginx/zinekide-chatbot.conf.template` a vuestro `sites-available/`.
-2. Sustituir `{{DOMAIN}}` por vuestro subdominio y `{{HOST_PORT}}` por `3001`.
-3. Copiar `nginx/zinekide-chatbot-proxy.conf` a `/etc/nginx/snippets/`.
-4. Emitir cert con `certbot --nginx -d <dominio>` o vuestro flujo habitual de Let's Encrypt.
-5. `nginx -t && systemctl reload nginx`.
-
-#### B) Si preferís el script automático
+Script idempotente — se puede ejecutar varias veces sin problema:
 
 ```bash
 sudo ./setup-nginx.sh
 ```
 
-El script lee `.env`, copia el template, emite cert con certbot, reload nginx. Idempotente.
+El script lee `.env`, monta una config Nginx temporal HTTP-only, emite el cert Let's Encrypt y deja la config definitiva con SSL + reverse proxy a `127.0.0.1:3001`.
 
-### Verificación
+### 5. Verificar
 
 ```bash
-curl https://<vuestro-dominio>/healthz
-# → {"status":"ok"}
+curl https://chatbot.zinekide.eus/healthz
+# {"status":"ok"}
 
-curl https://<vuestro-dominio>/readyz
-# → {"status":"ok","checks":{"llm_key":true,"partner_reachable":true}}
+curl https://chatbot.zinekide.eus/readyz
+# {"status":"ok","checks":{"llm_key":true,"partner_reachable":true}}
 
-curl -I https://<vuestro-dominio>/widget.latest.js
-# → HTTP/2 200, content-type: application/javascript
+curl -I https://chatbot.zinekide.eus/widget.latest.js
+# HTTP/2 200, content-type: application/javascript
 ```
 
-Si todo OK, insertar en el layout principal de vuestra web:
+### 6. Insertar el widget en zinekide.eus
+
+Una línea **antes de `</body>`** en el layout principal de Symfony (típicamente `templates/base.html.twig`):
 
 ```html
-<script src="https://<vuestro-dominio>/widget.latest.js" defer></script>
+<script
+  id="zinekide-widget-script"
+  src="https://chatbot.zinekide.eus/widget.latest.js"
+  defer
+></script>
 ```
 
----
-
-## Variables de entorno (resumen)
-
-Detalle completo y comentado en [`.env.example`](.env.example).
-
-| Variable | Requerido | Descripción |
-|----------|-----------|-------------|
-| `CHATBOT_IMAGE` | ✓ | Imagen Docker, ej. `ghcr.io/naahiki/zinekide-chatbot:2.0.6` |
-| `OPENAI_API_KEY` o `ANTHROPIC_API_KEY` | ✓ | Al menos una de las dos |
-| `PARTNER_API_URL` | ✓ | URL del Symfony con los endpoints REST |
-| `PARTNER_API_KEY` | ✓ | Bearer compartido para `/api/chat/events` |
-| `ALLOWED_ORIGINS` | ✓ | Dominios desde los que se carga el widget (CORS) |
-| `PUBLIC_DOMAIN` | ✓ | Subdominio del chatbot |
-| `ADMIN_EMAIL` | ✓ | Para registro Let's Encrypt |
-| `PARTNER_SEARCH_AUTH_*` |   | Solo si el endpoint search lleva auth |
+> **Importante:** no añadáis ningún `<script>` inline adicional que intente crear manualmente el elemento `<zinekide-widget>`. El bundle ya gestiona ciclo de vida completo (initial render + `astro:after-swap` + `astro:page-load` + rehidratación). Cualquier script paralelo crearía una **segunda instancia** del widget.
 
 ---
 
 ## Mantenimiento
 
-### Actualizar a versión nueva de la imagen
-
-```bash
-# Editar .env: CHATBOT_IMAGE=ghcr.io/naahiki/zinekide-chatbot:2.0.6
-docker compose pull
-docker compose up -d
-```
-
-Downtime ~5 segundos. Para rollback, volver a la tag anterior y repetir.
-
-### Logs
+### Ver logs
 
 ```bash
 docker compose logs chatbot-backend -f --tail=100
 ```
 
-### Rotación de claves
+### Actualizar a una versión nueva
 
-- **OpenAI/Anthropic**: actualizar valor en `.env` + `docker compose up -d --no-deps chatbot-backend`.
-- **`PARTNER_API_KEY`**: actualizar a la vez en `.env` del chatbot Y en la config del Symfony del partner.
+Cuando DVM publica `v2.0.24`, `v2.1.0`, etc.:
+
+```bash
+cd /opt/zinekide-chatbot
+git fetch --tags
+git checkout v2.0.24
+docker compose pull
+docker compose up -d
+```
+
+Downtime durante el `up -d`: ~5 segundos.
+
+### Rollback
+
+```bash
+git checkout v2.0.23
+docker compose pull
+docker compose up -d
+```
+
+### Rotar la API key del LLM
+
+```bash
+nano .env   # cambiar OPENAI_API_KEY
+docker compose up -d --no-deps chatbot-backend
+```
 
 ---
 
-## Recursos
+## Variables de entorno
 
-- **Especificación API completa** (los 6 endpoints que el cliente sirve): documento `Especificacion_API_Chatbot_Zinekide_v2.md` facilitado por DVM.
-- **Guía operativa completa**: documento `Despliegue_Chatbot_Zinekide_Guia.md`.
-- **Soporte**: DVM (nahiki.dev@gmail.com).
+| Variable | Requerido | Default | Descripción |
+|----------|-----------|---------|-------------|
+| `CHATBOT_IMAGE` | ✓ | — | Imagen Docker (`ghcr.io/naahiki/zinekide-chatbot:<version>`) |
+| `OPENAI_API_KEY` o `ANTHROPIC_API_KEY` | ✓ | — | Al menos una |
+| `PARTNER_API_URL` | ✓ | — | URL del Symfony de Veiss |
+| `ALLOWED_ORIGINS` | ✓ | — | Dominios donde se carga el widget (coma-separados) |
+| `PUBLIC_DOMAIN` | ✓ | — | Subdominio del chatbot |
+| `ADMIN_EMAIL` | ✓ | — | Email para Let's Encrypt |
+| `PARTNER_API_KEY` |   | — | Bearer para `/api/chat/events`. Opcional en la spec actual |
+| `LLM_PROVIDER` |   | `openai` | `openai` \| `anthropic` |
+| `LLM_MODEL` |   | `gpt-4o-mini` | Modelo inicial |
+| `LLM_CONFIG_FROM_PARTNER` |   | `false` | `true` solo cuando Veiss exponga `/api/assistant/config` |
+| `WIDGET_CONFIG_FROM_PARTNER` |   | `false` | `true` solo cuando Veiss exponga `/api/widget/config` |
+| `PARTNER_SEARCH_AUTH_SCHEME` |   | `none` | `none` \| `bearer` \| `apikey` |
+| `PARTNER_TIMEOUT_MS` |   | `5000` | Timeout llamadas a Veiss |
+| `RATE_LIMIT_SESSION_CAPACITY` |   | `20` | Mensajes/sesión |
+| `RATE_LIMIT_IP_CAPACITY` |   | `60` | Mensajes/IP |
+| `MAX_MESSAGE_LEN` |   | `2000` | Caracteres por mensaje |
+| `HOST_PORT` |   | `3001` | Puerto local del container |
+
+Plantilla completa con comentarios: [`.env.example`](.env.example).
 
 ---
 
-## Versionado
+## Problemas comunes
 
-Las tags de este repo siguen el versionado de la imagen Docker:
+| Síntoma | Causa probable |
+|---|---|
+| `setup-nginx.sh` falla emitiendo el cert | DNS no propagado todavía |
+| `/readyz` devuelve `partner_reachable:false` | DNS, firewall o Symfony caído |
+| `/readyz` devuelve `llm_key:false` | `OPENAI_API_KEY` vacía o mal formada |
+| Widget responde "ha habido un error" | `ALLOWED_ORIGINS` no incluye el dominio donde se carga |
+| Aparecen **dos widgets** en la web | Hay un `<script>` inline que crea otra instancia en paralelo al bundle — eliminarlo |
+| `tool_search_failed` con `err_kind:auth` | Auth de `/api/projects/search` mal configurado |
 
-- `v2.0.6` (actual) — fix: `Project.investment` es string (no number)
-- `v2.0.5` — filtrado por score + FORCE_PROJECT_STATUS + shape de `investment` reflejado
-- `v2.0.4` — events solo 3 campos + filtro `status[]` en search
-- `v2.0.3` — toggles `*_FROM_PARTNER` para escenarios sin esos endpoints
-- `v2.0.2` — widget embebido + plug & play
-- `v2.0.1` — refinamiento prompt
-- `v2.0.0` — primera release v2
+---
 
-Al actualizar la imagen (`CHATBOT_IMAGE` en `.env`), conviene también `git pull` en este repo por si hay cambios en `docker-compose.yml`, `nginx/*` o `setup-nginx.sh` que requieran ajustes.
+## Soporte
+
+- **Motor IA, widget, imagen Docker:** DVM — nahiki.dev@gmail.com.
+- **Symfony + panel admin + endpoints REST:** Veiss.
+- **API keys LLM + servidor de producción:** cliente final.
+
+Para incidencias urgentes, mandadme correo con:
+
+- `docker compose ps` y `docker compose logs chatbot-backend --tail=200`.
+- `curl -v https://chatbot.zinekide.eus/readyz`.
+- Versión actual: `grep CHATBOT_IMAGE .env`.

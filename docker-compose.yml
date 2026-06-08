@@ -18,7 +18,7 @@
 
 services:
   chatbot-backend:
-    image: ${CHATBOT_IMAGE:?defina CHATBOT_IMAGE (ej. ghcr.io/naahiki/zinekide-chatbot:2.0.2)}
+    image: ${CHATBOT_IMAGE:?defina CHATBOT_IMAGE (ej. ghcr.io/naahiki/zinekide-chatbot:2.0.23)}
     pull_policy: always
     ports:
       # Sólo loopback — el reverse proxy del host (Nginx) hace el reverse
@@ -30,13 +30,19 @@ services:
       # ─── LLM ────────────────────────────────────────────────────────────
       LLM_PROVIDER: ${LLM_PROVIDER:-openai}
       LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
-      LLM_CONFIG_FROM_PARTNER: ${LLM_CONFIG_FROM_PARTNER:-true}
-      WIDGET_CONFIG_FROM_PARTNER: ${WIDGET_CONFIG_FROM_PARTNER:-true}
+      # Defaults a false: en esta fase Veiss NO implementa /api/assistant/config
+      # ni /api/widget/config. Ponerlos a true sin endpoints provoca timeouts de
+      # 5s en arranque + cada 10 min. Cambiar a true cuando Veiss los exponga.
+      LLM_CONFIG_FROM_PARTNER: ${LLM_CONFIG_FROM_PARTNER:-false}
+      WIDGET_CONFIG_FROM_PARTNER: ${WIDGET_CONFIG_FROM_PARTNER:-false}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       # ─── Partner (Symfony de Veiss) ────────────────────────────────────
       PARTNER_API_URL: ${PARTNER_API_URL:?defina PARTNER_API_URL apuntando al Symfony de Veiss}
-      PARTNER_API_KEY: ${PARTNER_API_KEY:?defina PARTNER_API_KEY (Bearer compartido para /api/chat/events)}
+      # Bearer compartido para POST /api/chat/events. Opcional — la spec
+      # actual de Veiss (junio 2026) no aplica auth en ese endpoint. Dejar
+      # vacío hasta que Veiss confirme lo contrario.
+      PARTNER_API_KEY: ${PARTNER_API_KEY:-}
       PARTNER_SEARCH_AUTH_SCHEME: ${PARTNER_SEARCH_AUTH_SCHEME:-none}
       PARTNER_SEARCH_AUTH_TOKEN: ${PARTNER_SEARCH_AUTH_TOKEN:-}
       PARTNER_SEARCH_AUTH_HEADER: ${PARTNER_SEARCH_AUTH_HEADER:-}
