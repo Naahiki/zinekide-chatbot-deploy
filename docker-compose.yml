@@ -18,7 +18,7 @@
 
 services:
   chatbot-backend:
-    image: ${CHATBOT_IMAGE:?defina CHATBOT_IMAGE (ej. ghcr.io/naahiki/zinekide-chatbot:2.0.23)}
+    image: ${CHATBOT_IMAGE:?defina CHATBOT_IMAGE (ej. ghcr.io/naahiki/zinekide-chatbot:2.0.25)}
     pull_policy: always
     ports:
       # Sólo loopback — el reverse proxy del host (Nginx) hace el reverse
