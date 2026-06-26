@@ -5,7 +5,7 @@ Motor IA + widget conversacional para [Zinekide](https://zinekide.eus), la plata
 Construido por **[Data Value Management](https://datavaluemanagement.es)** (DVM) y desplegado en colaboración con **Veiss Comunicación**, que opera la web sobre Symfony.
 
 - **Especificación API completa**: [`Especificacion_API_Chatbot_Zinekide_v2.md`](../Especificacion_API_Chatbot_Zinekide_v2.md).
-- **Imagen Docker**: `ghcr.io/naahiki/zinekide-chatbot:2.0.27` (privada, acceso vía PAT facilitado por DVM).
+- **Imagen Docker**: `ghcr.io/naahiki/zinekide-chatbot:2.0.28` (privada, acceso vía PAT facilitado por DVM).
 - **Estado**: producción ready. Pipeline GHCR validado.
 
 ---
@@ -99,7 +99,7 @@ El widget se auto-monta como burbuja flotante en Shadow DOM. No interfiere con e
 ### Actualizar versión
 
 ```bash
-# Editar .env: CHATBOT_IMAGE=ghcr.io/naahiki/zinekide-chatbot:2.0.27
+# Editar .env: CHATBOT_IMAGE=ghcr.io/naahiki/zinekide-chatbot:2.0.28
 docker compose pull
 docker compose up -d
 ```
@@ -223,7 +223,7 @@ Publicar nueva versión:
 ```bash
 git tag v2.0.24 -m "v2.0.24 — descripción"
 git push origin v2.0.24
-# GitHub Actions builda y publica ghcr.io/naahiki/zinekide-chatbot:2.0.27
+# GitHub Actions builda y publica ghcr.io/naahiki/zinekide-chatbot:2.0.28
 ```
 
 Historial en [GitHub Releases](https://github.com/Naahiki/zinekide-chatbot/releases).
